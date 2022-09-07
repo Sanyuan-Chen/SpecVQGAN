@@ -151,9 +151,9 @@ def maybe_download_model(model_name: str, log_dir: str) -> str:
                     '/specvqgan_public/models/2021-05-19T22-16-54_vggsound_codebook.tar.gz',
         }
     }
-    print(f'Using: {model_name} ({name2info[model_name]["info"]})')
     model_dir = os.path.join(log_dir, model_name)
     if not os.path.exists(model_dir):
+        print(f'Using: {model_name} ({name2info[model_name]["info"]})')
         tar_local_path = os.path.join(log_dir, f'{model_name}.tar.gz')
         # check if tar already exists and its md5sum
         if not os.path.exists(tar_local_path) or md5_hash(tar_local_path) != name2info[model_name]['hash']:
@@ -181,7 +181,7 @@ def load_config(model_dir: str):
             elif 'vas.VAS' in config.data.params.train.target:
                 base_path = './data/vas/features/*/'
             else:
-                raise NotImplementedError
+                base_path = ''
             config.data.params[a] = os.path.join(base_path, Path(config.data.params[a]).name)
     return config
 

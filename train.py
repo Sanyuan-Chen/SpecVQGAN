@@ -19,6 +19,7 @@ from omegaconf import OmegaConf
 from PIL import Image
 from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback, LearningRateMonitor
+from pytorch_lightning.callbacks import ProgressBar
 from pytorch_lightning.trainer import Trainer
 from pytorch_lightning.utilities.distributed import rank_zero_only
 from torch.utils.data import DataLoader, Dataset
@@ -215,6 +216,24 @@ class SpectrogramDataModuleFromConfig(DataModuleFromConfig):
                 split.params.specs_dataset_cfg = specs_dataset_cfg
         super().__init__(batch_size, train, validation, test, wrap, num_workers)
 
+class FbankDataModuleFromConfig(DataModuleFromConfig):
+    '''avoiding duplication of hyper-parameters in the config by gross patching here '''
+    def __init__(self, batch_size, num_workers, spec_dir_path=None,
+                 sample_rate=None, fbank_bins=None, fbank_mean=None, fbank_std=None,
+                 wav_len=None, train=None, validation=None, test=None, wrap=False):
+        specs_dataset_cfg = {
+            # 'spec_dir_name': Path(spec_dir_path).name,
+            'spec_dir_path': spec_dir_path,
+            'sample_rate': sample_rate,
+            'fbank_bins': fbank_bins,
+            'fbank_mean': fbank_mean,
+            'fbank_std': fbank_std,
+            'wav_len': wav_len,
+        }
+        for name, split in {'train': train, 'validation': validation, 'test': test}.items():
+            if split is not None:
+                split.params.specs_dataset_cfg = specs_dataset_cfg
+        super().__init__(batch_size, train, validation, test, wrap, num_workers)
 
 class ConditionedSpectrogramDataModuleFromConfig(DataModuleFromConfig):
     '''avoiding duplication of hyper-parameters in the config by gross patching here '''
@@ -540,7 +559,8 @@ class ImageLogger(Callback):
     #    self.log_img(pl_module, batch, batch_idx, split='train')
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
-        self.log_img(pl_module, batch, batch_idx, split='val')
+        # self.log_img(pl_module, batch, batch_idx, split='val')
+        pass
 
 
 if __name__ == '__main__':
@@ -706,6 +726,12 @@ if __name__ == '__main__':
         callbacks_cfg = lightning_config.callbacks or OmegaConf.create()
         callbacks_cfg = OmegaConf.merge(default_callbacks_cfg, callbacks_cfg)
         trainer_kwargs['callbacks'] = [instantiate_from_config(callbacks_cfg[k]) for k in callbacks_cfg]
+        trainer_kwargs['callbacks'] += [ProgressBar(refresh_rate=100)]
+        # print(f"default_callbacks_cfg: {default_callbacks_cfg}")
+        # print(f"callbacks_cfg: {callbacks_cfg}")
+        # print(f"callbacks_cfg: {callbacks_cfg}")
+        # import pdb
+        # pdb.set_trace()
 
         trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
 
@@ -746,6 +772,7 @@ if __name__ == '__main__':
         signal.signal(signal.SIGUSR2, divein)
 
         # run
+        print('start training...', flush=True)
         if opt.train:
             try:
                 trainer.fit(model, data)
